@@ -1710,7 +1710,7 @@ async function initStripe() {
   try {
     const res = await fetch('/config');
     const cfg = await res.json();
-    stripe = Stripe(cfg.stripePublishableKey);
+    stripe = Stripe(cfg.stripeKey);
     const elements = stripe.elements();
     cardElement = elements.create('card', {
       style: {
@@ -1756,10 +1756,10 @@ async function processPayment() {
 
   try {
     // Create payment intent via edge function
-    const res = await fetch('/pay', {
+    const res = await fetch('/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: 100, currency: 'gbp' })
+      body: JSON.stringify({ holeName: pendingPaymentName, address: pendingPaymentAddress })
     });
     const { clientSecret, error: serverError } = await res.json();
     if (serverError) throw new Error(serverError);
