@@ -5,3 +5,7 @@
 [[edge_functions]]
   path = "/verify"
   function = "verify"
+
+[[edge_functions]]
+  path = "/config"
+  function = "verify"
