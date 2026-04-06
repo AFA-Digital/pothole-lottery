@@ -2180,9 +2180,9 @@ window.finaliseClaim = finaliseClaim;
 // ── SHARE ──
 function shareHole() {
   const name = document.getElementById('share-hole-name').textContent;
-  const text = `I just claimed ${name} on Pothole Lottery. Ignored by the council and counting. Put a quid in 👉 potholelottery.co.uk`;
+  const text = `I just claimed ${name} on Pothole Lottery. Ignored by the council and counting. Put a quid in 👉 potholelottery.app`;
   if (navigator.share) {
-    navigator.share({ title: 'Pothole Lottery', text, url: 'https://potholelottery.co.uk' });
+    navigator.share({ title: 'Pothole Lottery', text, url: 'https://potholelottery.app' });
   } else {
     navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
   }
