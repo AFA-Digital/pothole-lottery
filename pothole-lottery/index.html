@@ -1637,6 +1637,8 @@ async function initMap() {
     const res = await fetch('/config');
     const cfg = await res.json();
     MAPBOX_TOKEN = cfg.mapboxToken;
+    // Init Stripe with the key we just fetched
+    initStripe(cfg.stripeKey);
   } catch(e) {
     showToast('Config error — please refresh');
     hideLoading();
@@ -1674,11 +1676,9 @@ window.initMap = initMap;
 // ── STRIPE PAYMENT ──
 let stripe, cardElement, pendingPaymentName, pendingPaymentAddress;
 
-async function initStripe() {
+async function initStripe(stripeKey) {
   try {
-    const res = await fetch('/config');
-    const cfg = await res.json();
-    stripe = Stripe(cfg.stripeKey);
+    stripe = Stripe(stripeKey);
     const elements = stripe.elements();
     cardElement = elements.create('card', {
       style: {
@@ -1755,9 +1755,6 @@ async function processPayment() {
   }
 }
 window.processPayment = processPayment;
-
-// Init Stripe early
-initStripe();
 
 // (auth resume is handled directly in getRedirectResult above)
 
