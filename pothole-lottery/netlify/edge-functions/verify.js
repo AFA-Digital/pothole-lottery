@@ -1,21 +1,62 @@
 export default async (request, context) => {
   const url = new URL(request.url);
 
-  // ── CONFIG endpoint — serves public tokens to the frontend ──
+  // ── CONFIG — serves public tokens to frontend ──
   if (url.pathname === '/config') {
     return new Response(JSON.stringify({
-      mapboxToken: Deno.env.get('MAPBOX_TOKEN') || ''
+      mapboxToken: Deno.env.get('MAPBOX_TOKEN') || '',
+      stripeKey: Deno.env.get('STRIPE_PUBLISHABLE_KEY') || ''
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
-  // ── VERIFY endpoint — AI pothole verification ──
-  if (url.pathname === '/verify') {
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
+  // ── CREATE PAYMENT INTENT ──
+  if (url.pathname === '/create-payment-intent' && request.method === 'POST') {
+    try {
+      const secretKey = Deno.env.get('STRIPE_SECRET_KEY');
+      if (!secretKey) {
+        return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+          status: 500, headers: { 'Content-Type': 'application/json' }
+        });
+      }
 
+      const body = await request.json();
+      const holeName = body.holeName || 'Unknown';
+      const address = body.address || 'Unknown location';
+
+      const params = new URLSearchParams({
+        amount: '100', // £1.00 in pence
+        currency: 'gbp',
+        'metadata[holeName]': holeName,
+        'metadata[address]': address,
+        description: `Pothole Lottery — Claiming ${holeName} at ${address}`
+      });
+
+      const stripeRes = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+
+      const intent = await stripeRes.json();
+      return new Response(JSON.stringify({ clientSecret: intent.client_secret }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+    } catch(e) {
+      console.error(e);
+      return new Response(JSON.stringify({ error: 'Payment setup failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  // ── VERIFY POTHOLE ──
+  if (url.pathname === '/verify' && request.method === 'POST') {
     try {
       const { image } = await request.json();
       const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -72,4 +113,4 @@ export default async (request, context) => {
   return new Response('Not found', { status: 404 });
 };
 
-export const config = { path: ['/verify', '/config'] };
+export const config = { path: ['/verify', '/config', '/create-payment-intent'] };
