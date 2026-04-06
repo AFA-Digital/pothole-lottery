@@ -1083,6 +1083,109 @@ body::after {
   margin-top: 1rem;
 }
 
+
+/* ── STRIPE PAYMENT MODAL ── */
+.payment-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 5000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  backdrop-filter: blur(4px);
+}
+.payment-modal.show {
+  opacity: 1;
+  pointer-events: all;
+}
+.payment-inner {
+  background: var(--grey);
+  border-top: 3px solid var(--yellow);
+  padding: 1.5rem 1.5rem 2rem;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  transform: translateY(20px);
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.payment-modal.show .payment-inner { transform: translateY(0); }
+.payment-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: var(--mid);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.3rem 0.6rem;
+}
+.payment-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: var(--yellow);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+.payment-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--mid);
+  letter-spacing: 0.1em;
+  margin-bottom: 1.2rem;
+}
+.payment-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  background: var(--black);
+  margin-bottom: 1rem;
+}
+.payment-amount .lbl { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; }
+.payment-amount .amt { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--yellow); }
+#stripe-elements { margin-bottom: 1rem; }
+#stripe-elements .StripeElement {
+  background: var(--black);
+  border: 1px solid #333;
+  padding: 0.9rem;
+  transition: border-color 0.2s;
+}
+#stripe-elements .StripeElement--focus { border-color: var(--yellow); }
+#payment-error {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--red);
+  margin-bottom: 0.8rem;
+  min-height: 1.2rem;
+  letter-spacing: 0.05em;
+}
+.pay-btn {
+  width: 100%;
+  background: var(--yellow);
+  color: var(--black);
+  border: none;
+  padding: 1.1rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.7rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: transform 0.1s;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+}
+.pay-btn:active { transform: translate(2px,2px); }
+.pay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.test-card-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem;
+  color: #444;
+  text-align: center;
+  margin-top: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
 </style>
 </head>
 <body>
@@ -1218,7 +1321,7 @@ body::after {
   <div class="claim-legal">
     Your £1 goes into the regional pot. When this pothole is filled and verified,<br>
     the pot for this area is shared between all claimers. Terms apply.<br>
-    <strong style="color:#555">DEMO MODE — no real payment taken</strong>
+    <strong style="color:#555">TEST MODE — use card 4242 4242 4242 4242</strong>
   </div>
 </div>
 
@@ -1269,6 +1372,23 @@ body::after {
 
 <!-- ── TOAST ── -->
 <div class="toast" id="toast"></div>
+
+<!-- ── PAYMENT MODAL ── -->
+<div class="payment-modal" id="payment-modal">
+  <div class="payment-inner">
+    <div class="payment-close" onclick="hidePayment()">✕</div>
+    <div class="payment-title">PUT A QUID IN</div>
+    <div class="payment-sub" id="payment-hole-sub">Claiming your pothole</div>
+    <div class="payment-amount">
+      <div class="lbl">Entry to the regional pot</div>
+      <div class="amt">£1.00</div>
+    </div>
+    <div id="stripe-elements"></div>
+    <div id="payment-error"></div>
+    <button class="pay-btn" id="pay-btn" onclick="processPayment()">PAY £1.00 →</button>
+    <div class="test-card-hint">TEST MODE — use card 4242 4242 4242 4242 · any future date · any CVC</div>
+  </div>
+</div>
 
 <!-- ── AUTH MODAL ── -->
 <div class="auth-modal" id="auth-modal">
@@ -1438,7 +1558,7 @@ async function loadBoard() {
   `).join('');
 }
 
-window._submitClaim = async function(name, lat, lng, address, imageDataUrl) {
+window._submitClaim = async function(name, lat, lng, address, imageDataUrl, paymentId) {
   const { collection, addDoc, serverTimestamp } = window._fbModules;
   const db = window._db;
   showLoading('REGISTERING YOUR HOLE...');
@@ -1472,6 +1592,7 @@ window.daysSince = daysSince;
 
 <!-- Mapbox + App logic -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
 <script>
 let MAPBOX_TOKEN = '';
 
@@ -1567,6 +1688,9 @@ async function initMap() {
   map.on('error', () => { hideLoading(); showToast('Map error — check Mapbox token'); });
 }
 window.initMap = initMap;
+
+// Init Stripe early
+initStripe();
 
 // ── GEOLOCATION ──
 function getLocation() {
@@ -1906,15 +2030,19 @@ async function submitClaim() {
     return;
   }
 
-  const btn = document.getElementById('claim-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'REGISTERING...';
+  // Show payment modal — claim happens after payment succeeds
+  showPayment(name, capturedAddress || 'Unknown location');
+}
+window.submitClaim = submitClaim;
+
+// Called after payment succeeds
+async function finaliseClaim(name, paymentId) {
+  showLoading('REGISTERING YOUR HOLE...');
 
   const lat = userLat || 53.483;
   const lng = userLng || -2.244;
   const address = capturedAddress || 'Unknown location';
 
-  // Compress image for Firestore (keep small)
   let imageData = '';
   if (capturedImageDataUrl) {
     const tmpCanvas = document.createElement('canvas');
@@ -1928,22 +2056,19 @@ async function submitClaim() {
     imageData = tmpCanvas.toDataURL('image/jpeg', 0.5);
   }
 
-  const id = await window._submitClaim(name, lat, lng, address, imageData);
-
-  btn.disabled = false;
-  btn.textContent = 'PUT A QUID IN →';
+  const id = await window._submitClaim(name, lat, lng, address, imageData, paymentId);
+  hideLoading();
 
   if (id) {
-    // Populate confirmed screen
     document.getElementById('conf-name-sub').textContent = `You named it ${name}`;
     document.getElementById('conf-id').textContent = `HOLE #PL-${id.substring(0,6).toUpperCase()}`;
     document.getElementById('share-hole-name').textContent = name;
     document.getElementById('share-council').textContent = 'your council';
-    nameInput.value = '';
+    document.getElementById('hole-name-input').value = '';
     showScreen('confirmed-screen');
   }
 }
-window.submitClaim = submitClaim;
+window.finaliseClaim = finaliseClaim;
 
 // ── SHARE ──
 function shareHole() {
