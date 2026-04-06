@@ -9,3 +9,7 @@
 [[edge_functions]]
   path = "/config"
   function = "verify"
+
+[[edge_functions]]
+  path = "/create-payment-intent"
+  function = "verify"
