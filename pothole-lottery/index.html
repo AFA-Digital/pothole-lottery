@@ -1698,7 +1698,6 @@ window.daysSince = daysSince;
 
 <!-- Mapbox + App logic -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
-<script src="https://js.stripe.com/v3/"></script>
 <script>
 let MAPBOX_TOKEN = '';
 
@@ -1778,8 +1777,6 @@ async function initMap() {
     const res = await fetch('/config');
     const cfg = await res.json();
     MAPBOX_TOKEN = cfg.mapboxToken;
-    // Init Stripe with the key we just fetched
-    initStripe(cfg.stripeKey);
   } catch(e) {
     showToast('Config error — please refresh');
     hideLoading();
@@ -1815,89 +1812,6 @@ async function initMap() {
 window.initMap = initMap;
 
 // ── STRIPE PAYMENT ──
-let stripe, cardElement, pendingPaymentName, pendingPaymentAddress;
-
-async function initStripe(stripeKey) {
-  try {
-    stripe = Stripe(stripeKey);
-    const elements = stripe.elements();
-    cardElement = elements.create('card', {
-      hidePostalCode: true,
-      style: {
-        base: {
-          color: '#F0EDE6',
-          fontFamily: '"DM Mono", monospace',
-          fontSize: '15px',
-          '::placeholder': { color: '#555' }
-        },
-        invalid: { color: '#D42B2B' }
-      }
-    });
-    cardElement.mount('#stripe-elements');
-  } catch(e) {
-    console.error('Stripe init error:', e);
-  }
-}
-window.initStripe = initStripe;
-
-function showPayment(name, address) {
-  pendingPaymentName = name;
-  pendingPaymentAddress = address;
-  document.getElementById('payment-hole-sub').textContent = `Claiming: ${name}`;
-  document.getElementById('payment-error').textContent = '';
-  document.getElementById('payment-modal').classList.add('show');
-}
-window.showPayment = showPayment;
-
-function hidePayment() {
-  document.getElementById('payment-modal').classList.remove('show');
-}
-window.hidePayment = hidePayment;
-
-async function processPayment() {
-  if (!stripe || !cardElement) {
-    showToast('Payment not ready — please wait');
-    return;
-  }
-  const btn = document.getElementById('pay-btn');
-  btn.disabled = true;
-  btn.textContent = 'PROCESSING...';
-  document.getElementById('payment-error').textContent = '';
-
-  try {
-    // Create payment intent via edge function
-    const res = await fetch('/create-payment-intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holeName: pendingPaymentName, address: pendingPaymentAddress })
-    });
-    const { clientSecret, error: serverError } = await res.json();
-    if (serverError) throw new Error(serverError);
-
-    const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: { card: cardElement }
-    });
-
-    if (error) {
-      document.getElementById('payment-error').textContent = error.message;
-      btn.disabled = false;
-      btn.textContent = 'PAY £1.00 →';
-      return;
-    }
-
-    if (paymentIntent.status === 'succeeded') {
-      hidePayment();
-      finaliseClaim(pendingPaymentName, paymentIntent.id);
-    }
-  } catch(e) {
-    document.getElementById('payment-error').textContent = 'Payment failed — please try again';
-    btn.disabled = false;
-    btn.textContent = 'PAY £1.00 →';
-    console.error(e);
-  }
-}
-window.processPayment = processPayment;
-
 // Show Apple sign-in only in native app
 if (typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform()) {
   const appleBtn = document.getElementById('apple-signin-btn');
