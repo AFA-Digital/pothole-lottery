@@ -1492,19 +1492,22 @@ getRedirectResult(auth).then((result) => {
     sessionStorage.removeItem('pendingHoleName');
     sessionStorage.removeItem('pendingHoleAddress');
 
-    showToast('Welcome, ' + (user.displayName || 'back') + '! 🕳️');
+    // Defer until after the regular scripts have fully loaded and defined window functions
+    setTimeout(() => {
+      window.showToast && window.showToast('Welcome, ' + (user.displayName || 'back') + '! 🕳️');
 
-    if (name) {
-      document.getElementById('hole-name-input').value = name;
-      if (address) window.capturedAddress = address;
-      document.getElementById('claim-addr').textContent = address || 'Your location';
-      document.getElementById('claim-status-val').textContent = 'UNCLAIMED';
-      document.getElementById('claim-status-val').style.color = 'var(--yellow)';
-      document.getElementById('claim-claimers').textContent = '0 — be first!';
-      showScreen('claim-screen');
-      // Auto-trigger payment after a short beat
-      setTimeout(() => showPayment(name, address || 'Unknown location'), 600);
-    }
+      if (name) {
+        document.getElementById('hole-name-input').value = name;
+        if (address) window.capturedAddress = address;
+        document.getElementById('claim-addr').textContent = address || 'Your location';
+        document.getElementById('claim-status-val').textContent = 'UNCLAIMED';
+        document.getElementById('claim-status-val').style.color = 'var(--yellow)';
+        document.getElementById('claim-claimers').textContent = '0 — be first!';
+        window.showScreen && window.showScreen('claim-screen');
+        // Auto-trigger payment after a beat
+        setTimeout(() => window.showPayment && window.showPayment(name, address || 'Unknown location'), 800);
+      }
+    }, 300);
   }
 }).catch((e) => {
   console.error('Redirect result error:', e);
@@ -1699,6 +1702,91 @@ async function initMap() {
   map.on('error', () => { hideLoading(); showToast('Map error — check Mapbox token'); });
 }
 window.initMap = initMap;
+
+// ── STRIPE PAYMENT ──
+let stripe, cardElement, pendingPaymentName, pendingPaymentAddress;
+
+async function initStripe() {
+  try {
+    const res = await fetch('/config');
+    const cfg = await res.json();
+    stripe = Stripe(cfg.stripePublishableKey);
+    const elements = stripe.elements();
+    cardElement = elements.create('card', {
+      style: {
+        base: {
+          color: '#F0EDE6',
+          fontFamily: '"DM Mono", monospace',
+          fontSize: '15px',
+          '::placeholder': { color: '#555' }
+        },
+        invalid: { color: '#D42B2B' }
+      }
+    });
+    cardElement.mount('#stripe-elements');
+  } catch(e) {
+    console.error('Stripe init error:', e);
+  }
+}
+window.initStripe = initStripe;
+
+function showPayment(name, address) {
+  pendingPaymentName = name;
+  pendingPaymentAddress = address;
+  document.getElementById('payment-hole-sub').textContent = `Claiming: ${name}`;
+  document.getElementById('payment-error').textContent = '';
+  document.getElementById('payment-modal').classList.add('show');
+}
+window.showPayment = showPayment;
+
+function hidePayment() {
+  document.getElementById('payment-modal').classList.remove('show');
+}
+window.hidePayment = hidePayment;
+
+async function processPayment() {
+  if (!stripe || !cardElement) {
+    showToast('Payment not ready — please wait');
+    return;
+  }
+  const btn = document.getElementById('pay-btn');
+  btn.disabled = true;
+  btn.textContent = 'PROCESSING...';
+  document.getElementById('payment-error').textContent = '';
+
+  try {
+    // Create payment intent via edge function
+    const res = await fetch('/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: 100, currency: 'gbp' })
+    });
+    const { clientSecret, error: serverError } = await res.json();
+    if (serverError) throw new Error(serverError);
+
+    const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: { card: cardElement }
+    });
+
+    if (error) {
+      document.getElementById('payment-error').textContent = error.message;
+      btn.disabled = false;
+      btn.textContent = 'PAY £1.00 →';
+      return;
+    }
+
+    if (paymentIntent.status === 'succeeded') {
+      hidePayment();
+      finaliseClaim(pendingPaymentName, paymentIntent.id);
+    }
+  } catch(e) {
+    document.getElementById('payment-error').textContent = 'Payment failed — please try again';
+    btn.disabled = false;
+    btn.textContent = 'PAY £1.00 →';
+    console.error(e);
+  }
+}
+window.processPayment = processPayment;
 
 // Init Stripe early
 initStripe();
