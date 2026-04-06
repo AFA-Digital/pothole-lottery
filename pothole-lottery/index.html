@@ -1681,6 +1681,7 @@ async function initStripe(stripeKey) {
     stripe = Stripe(stripeKey);
     const elements = stripe.elements();
     cardElement = elements.create('card', {
+      hidePostalCode: true,
       style: {
         base: {
           color: '#F0EDE6',
