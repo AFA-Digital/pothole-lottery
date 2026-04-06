@@ -1486,14 +1486,12 @@ window._signInWithApple = async () => {
 getRedirectResult(auth).then((result) => {
   if (result && result.user) {
     sessionStorage.removeItem('authPending');
-    showToast('Welcome, ' + (result.user.displayName || 'back') + '! 🕳️');
-    // If there was a pending claim, trigger it
-    const pendingName = sessionStorage.getItem('pendingHoleName');
-    if (pendingName) {
-      sessionStorage.removeItem('pendingHoleName');
-      document.getElementById('hole-name-input').value = pendingName;
-      showScreen('claim-screen');
-    }
+    // Wait for app to fully init before resuming
+    window._pendingAuthUser = result.user;
+    window._pendingAuthName = sessionStorage.getItem('pendingHoleName');
+    window._pendingAuthAddress = sessionStorage.getItem('pendingHoleAddress');
+    sessionStorage.removeItem('pendingHoleName');
+    sessionStorage.removeItem('pendingHoleAddress');
   }
 }).catch((e) => {
   console.error('Redirect result error:', e);
@@ -1691,6 +1689,33 @@ window.initMap = initMap;
 
 // Init Stripe early
 initStripe();
+
+// Resume pending auth flow if returning from Google redirect
+setTimeout(() => {
+  if (window._pendingAuthUser) {
+    const name = window._pendingAuthName;
+    const address = window._pendingAuthAddress;
+    const user = window._pendingAuthUser;
+    window._pendingAuthUser = null;
+    window._pendingAuthName = null;
+    window._pendingAuthAddress = null;
+
+    showToast('Welcome, ' + (user.displayName || 'back') + '! 🕳️');
+
+    if (name) {
+      // Restore claim screen state and go straight to payment
+      document.getElementById('hole-name-input').value = name;
+      if (address) capturedAddress = address;
+      document.getElementById('claim-addr').textContent = address || 'Your location';
+      document.getElementById('claim-status-val').textContent = 'UNCLAIMED';
+      document.getElementById('claim-status-val').style.color = 'var(--yellow)';
+      document.getElementById('claim-claimers').textContent = '0 — be first!';
+      showScreen('claim-screen');
+      // Auto-trigger payment after a beat
+      setTimeout(() => showPayment(name, address || 'Unknown location'), 600);
+    }
+  }
+}, 1500);
 
 // ── GEOLOCATION ──
 function getLocation() {
@@ -2017,6 +2042,7 @@ async function submitClaim() {
     // Save hole name so we can restore after redirect auth
     const nameVal = document.getElementById('hole-name-input').value.trim();
     if (nameVal) sessionStorage.setItem('pendingHoleName', nameVal);
+    if (capturedAddress) sessionStorage.setItem('pendingHoleAddress', capturedAddress);
     showAuth(() => submitClaim());
     return;
   }
