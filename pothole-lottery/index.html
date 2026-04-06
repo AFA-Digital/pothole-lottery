@@ -1634,7 +1634,11 @@ function updateStats(holes) {
   document.getElementById('stat-record').textContent = maxDays || '–';
   document.getElementById('pot-display').textContent = `£${pot}`;
   document.getElementById('splash-stats').innerHTML =
-    `<strong>£${pot}</strong> in the pot &nbsp;·&nbsp; <strong>${total}</strong> holes reported &nbsp;·&nbsp; <strong>${fixed}</strong> fixed`;
+    `<div style="display:flex;flex-direction:column;gap:0.3rem;align-items:center;">
+      <span><strong>£${pot}</strong> in the pot</span>
+      <span><strong>${total}</strong> holes reported</span>
+      <span><strong>${fixed}</strong> fixed</span>
+    </div>`;
 }
 
 window.updateStats = updateStats;
