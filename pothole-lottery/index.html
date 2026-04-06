@@ -1308,7 +1308,7 @@ window.daysSince = daysSince;
 <!-- Mapbox + App logic -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <script>
-const MAPBOX_TOKEN = 'pk.eyJ1IjoicG90aG9sZXMiLCJhIjoiY21ubXphdXZ6MWQzODJvcXNuY3J5NXZybSJ9.XnJMs8p2ooYYRBiWA1AfWg';
+let MAPBOX_TOKEN = '';
 
 let map, userLng, userLat, videoStream, capturedImageDataUrl, capturedAddress;
 let currentScreen = 'splash';
@@ -1360,9 +1360,20 @@ function switchTab(tab) {
 window.switchTab = switchTab;
 
 // ── MAP INIT ──
-function initMap() {
+async function initMap() {
   showLoading('LOADING MAP...');
   showScreen('map-screen');
+
+  // Fetch token from edge function
+  try {
+    const res = await fetch('/config');
+    const cfg = await res.json();
+    MAPBOX_TOKEN = cfg.mapboxToken;
+  } catch(e) {
+    showToast('Config error — please refresh');
+    hideLoading();
+    return;
+  }
 
   mapboxgl.accessToken = MAPBOX_TOKEN;
 
