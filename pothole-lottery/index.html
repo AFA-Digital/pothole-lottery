@@ -1426,7 +1426,7 @@ body::after {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc, increment, serverTimestamp, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, onAuthStateChanged, signOut }
+import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, OAuthProvider, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1460,10 +1460,8 @@ onAuthStateChanged(auth, (user) => {
 window._signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try {
-    // Save pending state so we can resume after redirect
-    sessionStorage.setItem('authPending', 'true');
-    await signInWithRedirect(auth, provider);
-    return true;
+    const result = await signInWithPopup(auth, provider);
+    return !!result.user;
   } catch(e) {
     console.error(e);
     return false;
@@ -1473,45 +1471,15 @@ window._signInWithGoogle = async () => {
 window._signInWithApple = async () => {
   const provider = new OAuthProvider('apple.com');
   try {
-    sessionStorage.setItem('authPending', 'true');
-    await signInWithRedirect(auth, provider);
-    return true;
+    const result = await signInWithPopup(auth, provider);
+    return !!result.user;
   } catch(e) {
     console.error(e);
     return false;
   }
 };
 
-// Handle redirect result on page load
-getRedirectResult(auth).then((result) => {
-  if (result && result.user) {
-    sessionStorage.removeItem('authPending');
-    const user = result.user;
-    const name = sessionStorage.getItem('pendingHoleName');
-    const address = sessionStorage.getItem('pendingHoleAddress');
-    sessionStorage.removeItem('pendingHoleName');
-    sessionStorage.removeItem('pendingHoleAddress');
-
-    // Defer until after the regular scripts have fully loaded and defined window functions
-    setTimeout(() => {
-      window.showToast && window.showToast('Welcome, ' + (user.displayName || 'back') + '! 🕳️');
-
-      if (name) {
-        document.getElementById('hole-name-input').value = name;
-        if (address) window.capturedAddress = address;
-        document.getElementById('claim-addr').textContent = address || 'Your location';
-        document.getElementById('claim-status-val').textContent = 'UNCLAIMED';
-        document.getElementById('claim-status-val').style.color = 'var(--yellow)';
-        document.getElementById('claim-claimers').textContent = '0 — be first!';
-        window.showScreen && window.showScreen('claim-screen');
-        // Auto-trigger payment after a beat
-        setTimeout(() => window.showPayment && window.showPayment(name, address || 'Unknown location'), 800);
-      }
-    }, 300);
-  }
-}).catch((e) => {
-  console.error('Redirect result error:', e);
-});
+// Sign-in now uses popup — no redirect handling needed
 
 window._signOut = async () => {
   await signOut(auth);
@@ -2119,11 +2087,6 @@ window.signInApple = signInApple;
 async function submitClaim() {
   // Check auth first
   if (!window._currentUser) {
-    // Save hole name so we can restore after redirect auth
-    const nameVal = document.getElementById('hole-name-input').value.trim();
-    if (nameVal) sessionStorage.setItem('pendingHoleName', nameVal);
-    const addr = capturedAddress || window.capturedAddress;
-    if (addr) sessionStorage.setItem('pendingHoleAddress', addr);
     showAuth(() => submitClaim());
     return;
   }
