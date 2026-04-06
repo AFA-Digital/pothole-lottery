@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#F5C000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="description" content="Put a quid in. Keep complaining. Council fills your holes.">
+<title>POTHOLE LOTTERY</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+
+<style>
+:root {
+  --yellow: #F5C000;
+  --black: #0A0A0A;
+  --red: #D42B2B;
+  --white: #F0EDE6;
+  --grey: #1E1E1E;
+  --mid: #555;
+  --border: #2a2a2a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--black);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+/* ── NOISE ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.5;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+  z-index: 20;
+}
+
+/* ════════════════════════════════
+   SPLASH
+════════════════════════════════ */
+#splash {
+  background: var(--yellow);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#splash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(-45deg, transparent, transparent 30px, rgba(0,0,0,0.055) 30px, rgba(0,0,0,0.055) 60px);
+}
+
+.splash-inner {
+  text-align: center;
+  z-index: 1;
+  padding: 2rem;
+  animation: riseIn 0.7s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.logo-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  color: var(--black);
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+}
+
+.logo-word {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(4.5rem, 20vw, 8rem);
+  line-height: 0.88;
+  color: var(--black);
+  display: block;
+}
+
+.logo-word.outline {
+  -webkit-text-stroke: 3px var(--black);
+  color: transparent;
+  font-size: clamp(5.5rem, 24vw, 10rem);
+}
+
+.tagline {
+  margin-top: 1.4rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: clamp(1rem, 4.5vw, 1.4rem);
+  color: var(--black);
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tagline em {
+  font-style: normal;
+  background: var(--black);
+  color: var(--yellow);
+  padding: 1px 7px;
+}
+
+.splash-cta {
+  margin-top: 2.5rem;
+  background: var(--black);
+  color: var(--yellow);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.7rem;
+  letter-spacing: 0.1em;
+  padding: 1rem 2.8rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 rgba(0,0,0,0.2);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.splash-cta:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
+
+.live-stats {
+  margin-top: 2rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--black);
+  opacity: 0.55;
+  letter-spacing: 0.1em;
+}
+
+.live-stats strong { opacity: 1; font-size: 1rem; }
+
+/* ════════════════════════════════
+   MAP
+════════════════════════════════ */
+#map-screen { background: var(--black); }
+
+.top-bar {
+  background: var(--yellow);
+  padding: 0.9rem 1.2rem 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--black);
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.top-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--black);
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+
+.top-pot { text-align: right; }
+.top-pot .pot-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--black);
+  opacity: 0.55;
+  letter-spacing: 0.2em;
+}
+.top-pot .pot-amount {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: var(--black);
+  line-height: 1;
+}
+
+#mapbox-container {
+  flex: 1;
+  position: relative;
+}
+
+.mapboxgl-map { font-family: 'DM Mono', monospace !important; }
+
+/* Custom marker */
+.hole-marker-el {
+  cursor: pointer;
+}
+
+.hole-dot {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 3px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+  transition: transform 0.15s;
+  animation: markerIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+
+.hole-dot:hover { transform: scale(1.15); }
+
+@keyframes markerIn {
+  from { transform: scale(0) translateY(10px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.hole-label-tag {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--black);
+  color: var(--yellow);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem;
+  padding: 2px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.hole-days-tag {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.48rem;
+  color: var(--red);
+  white-space: nowrap;
+  pointer-events: none;
+  font-weight: 500;
+}
+
+/* Mapbox popup */
+.mapboxgl-popup-content {
+  background: var(--black) !important;
+  border: 2px solid var(--yellow) !important;
+  border-radius: 0 !important;
+  color: var(--white) !important;
+  padding: 1rem !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  min-width: 200px;
+}
+.mapboxgl-popup-tip { display: none !important; }
+.mapboxgl-popup-close-button {
+  color: var(--yellow) !important;
+  font-size: 1.2rem !important;
+  padding: 0.3rem 0.5rem !important;
+}
+
+.popup-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--yellow);
+  line-height: 1;
+  margin-bottom: 0.3rem;
+}
+.popup-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: #888;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.7rem;
+}
+.popup-days {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: var(--red);
+}
+.popup-claimers {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  color: #666;
+  margin-top: 0.3rem;
+}
+
+/* FAB */
+.fab {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--yellow);
+  color: var(--black);
+  border: none;
+  padding: 1rem 2rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5), 4px 4px 0 rgba(0,0,0,0.25);
+  white-space: nowrap;
+  z-index: 5;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.fab:active { transform: translateX(-50%) translate(2px,2px); box-shadow: 0 3px 12px rgba(0,0,0,0.4), 2px 2px 0 rgba(0,0,0,0.25); }
+
+/* Location dot */
+.my-location-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.25);
+}
+
+/* Stats bar */
+.stats-bar {
+  background: var(--grey);
+  border-top: 2px solid var(--border);
+  padding: 0.6rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  flex-shrink: 0;
+}
+
+.stat { text-align: center; }
+.stat-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  color: var(--yellow);
+  line-height: 1;
+}
+.stat-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--mid);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+/* Bottom nav */
+.bottom-nav {
+  background: var(--grey);
+  border-top: 2px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  flex-shrink: 0;
+}
+.nav-btn {
+  background: none;
+  border: none;
+  padding: 0.7rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  cursor: pointer;
+  color: var(--mid);
+  transition: background 0.15s, color 0.15s;
+}
+.nav-btn.active { color: var(--yellow); }
+.nav-btn:hover { background: #111; }
+.nav-icon { font-size: 1.15rem; }
+.nav-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ════════════════════════════════
+   CAMERA
+════════════════════════════════ */
+#camera-screen {
+  background: #000;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.cam-header {
+  width: 100%;
+  padding: 1rem 1.2rem 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 2;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+}
+
+.cam-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  color: var(--yellow);
+  letter-spacing: 0.05em;
+}
+
+.cam-back {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.6);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  letter-spacing: 0.12em;
+}
+
+.cam-viewport {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+#camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* AR overlay */
+.ar-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ar-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: var(--yellow);
+  border-style: solid;
+  border-width: 0;
+}
+.ar-corner.tl { top: 1.5rem; left: 1.5rem; border-top-width: 3px; border-left-width: 3px; }
+.ar-corner.tr { top: 1.5rem; right: 1.5rem; border-top-width: 3px; border-right-width: 3px; }
+.ar-corner.bl { bottom: 1.5rem; left: 1.5rem; border-bottom-width: 3px; border-left-width: 3px; }
+.ar-corner.br { bottom: 1.5rem; right: 1.5rem; border-bottom-width: 3px; border-right-width: 3px; }
+
+.scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--yellow), transparent);
+  animation: scanDown 2.5s linear infinite;
+  opacity: 0.7;
+}
+@keyframes scanDown {
+  0% { top: 5%; }
+  100% { top: 95%; }
+}
+
+.ar-status {
+  position: absolute;
+  top: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.75);
+  border: 1px solid rgba(245,192,0,0.5);
+  color: var(--yellow);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  padding: 0.4rem 0.9rem;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  transition: all 0.3s;
+}
+
+.ar-status.detected {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.target-ellipse {
+  position: absolute;
+  bottom: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 80px;
+  border: 2px solid var(--yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(245,192,0,0.25);
+  animation: targetPulse 2s ease-in-out infinite;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.target-ellipse.locked {
+  border-color: var(--red);
+  box-shadow: 0 0 24px rgba(212,43,43,0.4);
+}
+
+@keyframes targetPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.gps-indicator {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+/* Shutter area */
+.cam-controls {
+  width: 100%;
+  padding: 1.2rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(8px);
+  gap: 2rem;
+}
+
+.shutter-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--yellow);
+  border: 5px solid rgba(245,192,0,0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  box-shadow: 0 0 0 8px rgba(245,192,0,0.12);
+  transition: transform 0.1s, box-shadow 0.1s;
+  outline: none;
+  flex-shrink: 0;
+}
+.shutter-btn:active { transform: scale(0.92); box-shadow: 0 0 0 4px rgba(245,192,0,0.08); }
+
+.cam-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.1em;
+  text-align: center;
+  max-width: 120px;
+  line-height: 1.5;
+}
+
+/* ════════════════════════════════
+   CLAIM
+════════════════════════════════ */
+#claim-screen { overflow-y: auto; }
+
+.claim-hero {
+  background: var(--red);
+  padding: 1.4rem 1.2rem 1.1rem;
+  border-bottom: 3px solid #8a0000;
+  flex-shrink: 0;
+}
+.claim-flag {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  opacity: 0.7;
+  margin-bottom: 0.3rem;
+}
+.claim-headline {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.8rem;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+}
+.claim-sub {
+  font-weight: 400;
+  font-size: 0.95rem;
+  opacity: 0.8;
+  margin-top: 0.4rem;
+}
+
+.claim-photo {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #111;
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#claim-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.claim-photo-label {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 0.8rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.08em;
+  background: rgba(0,0,0,0.5);
+  padding: 2px 6px;
+}
+
+.claim-body {
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+.info-card {
+  background: #1a1a1a;
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid var(--yellow);
+}
+.info-card .lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--mid);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+.info-card .val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.name-field {
+  background: #1a1a1a;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid var(--yellow);
+}
+.name-field label {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--mid);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.name-input {
+  width: 100%;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  color: var(--white);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+  text-transform: uppercase;
+}
+.name-input:focus { border-color: var(--yellow); }
+
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  background: #1a1a1a;
+}
+.price-lbl { font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 700; }
+.price-amt { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; color: var(--yellow); }
+
+.claim-submit {
+  width: 100%;
+  background: var(--yellow);
+  color: var(--black);
+  border: none;
+  padding: 1.2rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.9rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: transform 0.1s;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+}
+.claim-submit:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 rgba(0,0,0,0.3); }
+.claim-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.claim-legal {
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  color: #444;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 1.2rem 1.2rem;
+  line-height: 1.7;
+}
+
+/* ════════════════════════════════
+   CONFIRMED
+════════════════════════════════ */
+#confirmed-screen {
+  background: var(--yellow);
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.confirmed-inner {
+  animation: riseIn 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+  width: 100%;
+  max-width: 360px;
+}
+
+.confirmed-emoji {
+  font-size: 3.5rem;
+  display: block;
+  margin-bottom: 0.8rem;
+  animation: popIn 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s both;
+}
+@keyframes popIn {
+  from { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.confirmed-headline {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(3.5rem, 14vw, 5.5rem);
+  color: var(--black);
+  line-height: 0.9;
+  margin-bottom: 0.8rem;
+}
+.confirmed-name-sub {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: var(--black);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.confirmed-id {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--black);
+  opacity: 0.45;
+  letter-spacing: 0.15em;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.share-card {
+  background: var(--black);
+  padding: 1rem 1.2rem;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+.share-card-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--yellow);
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+}
+.share-card-body {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--white);
+  line-height: 1.4;
+}
+.share-card-body em { font-style: normal; color: var(--yellow); }
+
+.btn-share {
+  width: 100%;
+  background: var(--black);
+  color: var(--yellow);
+  border: none;
+  padding: 1rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  margin-bottom: 0.7rem;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  transition: transform 0.1s;
+}
+.btn-share:active { transform: translate(2px,2px); }
+
+.btn-map {
+  width: 100%;
+  background: transparent;
+  color: var(--black);
+  border: 2px solid var(--black);
+  padding: 0.8rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+/* ════════════════════════════════
+   SHAME BOARD
+════════════════════════════════ */
+#board-screen { overflow-y: auto; }
+
+.board-header {
+  background: var(--black);
+  border-bottom: 3px solid var(--yellow);
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.board-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: var(--yellow);
+  letter-spacing: 0.05em;
+}
+.board-back {
+  background: none;
+  border: 1px solid #333;
+  color: var(--mid);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+}
+
+#board-list { flex: 1; overflow-y: auto; }
+
+.board-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--mid);
+  letter-spacing: 0.1em;
+  line-height: 2;
+}
+
+.board-item {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid #1a1a1a;
+  gap: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.board-item:hover { background: #111; }
+
+.board-rank {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  color: #2a2a2a;
+  width: 32px;
+  flex-shrink: 0;
+  line-height: 1;
+  text-align: center;
+}
+.board-item:nth-child(1) .board-rank { color: var(--yellow); }
+.board-item:nth-child(2) .board-rank { color: #999; }
+.board-item:nth-child(3) .board-rank { color: #cd7f32; }
+
+.board-pit {
+  width: 42px; height: 26px;
+  background: #1a1a1a;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 3px 8px rgba(0,0,0,0.8);
+}
+
+.board-info { flex: 1; min-width: 0; }
+.board-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--mid);
+  margin-top: 2px;
+}
+
+.board-days { text-align: right; flex-shrink: 0; }
+.board-days .dnum {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  color: var(--red);
+  line-height: 1;
+}
+.board-days .dlbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.48rem;
+  color: #444;
+  letter-spacing: 0.08em;
+}
+
+.board-nav {
+  background: var(--grey);
+  border-top: 2px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  flex-shrink: 0;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #1a1a1a;
+  border: 1px solid var(--yellow);
+  color: var(--white);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  padding: 0.7rem 1.2rem;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 9000;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── LOADING OVERLAY ── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.loading-overlay.show { opacity: 1; pointer-events: all; }
+.loading-inner { text-align: center; }
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: var(--yellow);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--yellow);
+  letter-spacing: 0.15em;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SPLASH ══ -->
+<div id="splash" class="screen active">
+  <div class="splash-inner">
+    <div class="logo-eyebrow">🇬🇧 Britain's most satisfying civic app</div>
+    <span class="logo-word">POTHOLE</span>
+    <span class="logo-word outline">LOTTERY</span>
+    <div class="tagline">
+      Put a quid in. Keep complaining.<br>
+      <em>Council fills your holes.</em>
+    </div>
+    <button class="splash-cta" onclick="initMap()">FIND A HOLE →</button>
+    <div class="live-stats" id="splash-stats">
+      Loading live data...
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAP ══ -->
+<div id="map-screen" class="screen">
+  <div class="top-bar">
+    <div class="top-logo">POTHOLE<br>LOTTERY</div>
+    <div class="top-pot">
+      <div class="pot-label">REGIONAL POT</div>
+      <div class="pot-amount" id="pot-display">£0</div>
+    </div>
+  </div>
+  <div id="mapbox-container"></div>
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-num" id="stat-reported">0</div>
+      <div class="stat-lbl">Reported</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-fixed">0</div>
+      <div class="stat-lbl">Fixed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-record">–</div>
+      <div class="stat-lbl">Days (record)</div>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-map" onclick="switchTab('map')">
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-lbl">Map</span>
+    </button>
+    <button class="nav-btn" id="nav-board" onclick="switchTab('board')">
+      <span class="nav-icon">🏆</span>
+      <span class="nav-lbl">Shame Board</span>
+    </button>
+    <button class="nav-btn" id="nav-mine" onclick="showToast('Profile coming soon')">
+      <span class="nav-icon">👤</span>
+      <span class="nav-lbl">Mine</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ══ CAMERA ══ -->
+<div id="camera-screen" class="screen">
+  <div class="cam-header">
+    <div class="cam-title">📸 CLAIM A HOLE</div>
+    <button class="cam-back" onclick="stopCamera(); showScreen('map-screen')">← BACK</button>
+  </div>
+  <div class="cam-viewport">
+    <video id="camera-video" autoplay playsinline muted></video>
+    <div class="ar-overlay">
+      <div class="ar-corner tl"></div>
+      <div class="ar-corner tr"></div>
+      <div class="ar-corner bl"></div>
+      <div class="ar-corner br"></div>
+      <div class="scan-line"></div>
+      <div class="ar-status" id="ar-status">🔍 POINT AT A POTHOLE</div>
+      <div class="target-ellipse" id="target-ellipse"></div>
+      <div class="gps-indicator" id="gps-indicator">📍 Getting location...</div>
+    </div>
+  </div>
+  <div class="cam-controls">
+    <div class="cam-hint">Point at the pothole &amp; tap to capture</div>
+    <button class="shutter-btn" id="shutter-btn" onclick="capturePhoto()">🕳️</button>
+    <div class="cam-hint">Your GPS location is recorded automatically</div>
+  </div>
+</div>
+
+<!-- ══ CLAIM ══ -->
+<div id="claim-screen" class="screen">
+  <div class="claim-hero">
+    <div class="claim-flag">✅ POTHOLE CAPTURED · CHECKING DATABASE...</div>
+    <div class="claim-headline">CLAIM<br>THIS HOLE</div>
+    <div class="claim-sub">Name it. Shame it. Win when it gets filled.</div>
+  </div>
+  <div class="claim-photo">
+    <canvas id="claim-canvas"></canvas>
+    <div class="claim-photo-label" id="claim-location-label">📍 Locating...</div>
+  </div>
+  <div class="claim-body">
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="lbl">Location</div>
+        <div class="val" id="claim-addr">Detecting...</div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">Status</div>
+        <div class="val" id="claim-status-val" style="color:var(--yellow)">CHECKING...</div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">Coordinates</div>
+        <div class="val" id="claim-coords">–</div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">Claimers</div>
+        <div class="val" id="claim-claimers">–</div>
+      </div>
+    </div>
+
+    <div class="name-field">
+      <label>Name your pothole</label>
+      <input id="hole-name-input" class="name-input" type="text" placeholder="GERALD, THE VOID, BIG DEREK..." maxlength="20">
+    </div>
+
+    <div class="price-row">
+      <div class="price-lbl">Entry to the regional pot</div>
+      <div class="price-amt">£1.00</div>
+    </div>
+
+    <button class="claim-submit" id="claim-submit-btn" onclick="submitClaim()">
+      PUT A QUID IN →
+    </button>
+  </div>
+  <div class="claim-legal">
+    Your £1 goes into the regional pot. When this pothole is filled and verified,<br>
+    the pot for this area is shared between all claimers. Terms apply.<br>
+    <strong style="color:#555">DEMO MODE — no real payment taken</strong>
+  </div>
+</div>
+
+<!-- ══ CONFIRMED ══ -->
+<div id="confirmed-screen" class="screen">
+  <div class="confirmed-inner">
+    <span class="confirmed-emoji">🎉</span>
+    <div class="confirmed-headline">HOLE<br>CLAIMED</div>
+    <div class="confirmed-name-sub" id="conf-name-sub">You named it GERALD</div>
+    <div class="confirmed-id" id="conf-id">HOLE #PL-0000</div>
+    <div class="share-card">
+      <div class="share-card-eyebrow">SHARE & SHAME</div>
+      <div class="share-card-body" id="share-text">
+        I just claimed <em id="share-hole-name">GERALD</em> on Pothole Lottery.<br>
+        Ignored by <em id="share-council">your council</em> and counting.<br>
+        Put a quid in 👉 afa.digital/pothole
+      </div>
+    </div>
+    <button class="btn-share" onclick="shareHole()">📣 SHARE & SHAME</button>
+    <button class="btn-map" onclick="showScreen('map-screen')">BACK TO MAP</button>
+  </div>
+</div>
+
+<!-- ══ SHAME BOARD ══ -->
+<div id="board-screen" class="screen">
+  <div class="board-header">
+    <div class="board-title">🏆 SHAME BOARD</div>
+    <button class="board-back" onclick="switchTab('map')">← MAP</button>
+  </div>
+  <div id="board-list">
+    <div class="board-empty">Loading the wall of shame...</div>
+  </div>
+  <nav class="board-nav bottom-nav">
+    <button class="nav-btn" id="bnav-map" onclick="switchTab('map')">
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-lbl">Map</span>
+    </button>
+    <button class="nav-btn active" id="bnav-board">
+      <span class="nav-icon">🏆</span>
+      <span class="nav-lbl">Shame Board</span>
+    </button>
+    <button class="nav-btn" onclick="showToast('Profile coming soon')">
+      <span class="nav-icon">👤</span>
+      <span class="nav-lbl">Mine</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── LOADING ── -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-inner">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">LOADING...</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+  SCRIPTS
+══════════════════════════════════════ -->
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc, increment, serverTimestamp, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAluX-ACikdWJP2oNYx5E5klX40tRFP_LI",
+  authDomain: "pothole-lottery.firebaseapp.com",
+  projectId: "pothole-lottery",
+  storageBucket: "pothole-lottery.firebasestorage.app",
+  messagingSenderId: "212818505027",
+  appId: "1:212818505027:web:dd90f29ed635cfb87853f6",
+  measurementId: "G-M2G5E9Y609"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window._db = db;
+window._fbModules = { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc, increment, serverTimestamp, onSnapshot };
+
+// Live listener for stats
+const holesRef = collection(db, 'potholes');
+onSnapshot(holesRef, (snap) => {
+  const holes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  window._holes = holes;
+  updateStats(holes);
+  if (window._map) renderMarkers(holes);
+});
+
+function updateStats(holes) {
+  const total = holes.length;
+  const pot = total; // £1 per claim (simplified — real would sum claimers)
+  const fixed = holes.filter(h => h.fixed).length;
+  const maxDays = holes.reduce((mx, h) => {
+    const days = daysSince(h.createdAt);
+    return days > mx ? days : mx;
+  }, 0);
+
+  document.getElementById('stat-reported').textContent = total;
+  document.getElementById('stat-fixed').textContent = fixed;
+  document.getElementById('stat-record').textContent = maxDays || '–';
+  document.getElementById('pot-display').textContent = `£${pot}`;
+  document.getElementById('splash-stats').innerHTML =
+    `<strong>£${pot}</strong> in the pot &nbsp;·&nbsp; <strong>${total}</strong> holes reported &nbsp;·&nbsp; <strong>${fixed}</strong> fixed`;
+}
+
+window.updateStats = updateStats;
+window.loadBoard = loadBoard;
+
+async function loadBoard() {
+  const boardEl = document.getElementById('board-list');
+  const holes = window._holes || [];
+  if (!holes.length) {
+    boardEl.innerHTML = `<div class="board-empty">No holes claimed yet.<br>Be the first — get out there.</div>`;
+    return;
+  }
+  const sorted = [...holes].sort((a,b) => daysSince(b.createdAt) - daysSince(a.createdAt));
+  boardEl.innerHTML = sorted.map((h, i) => `
+    <div class="board-item">
+      <div class="board-rank">${i+1}</div>
+      <div class="board-pit"></div>
+      <div class="board-info">
+        <div class="board-name">${h.name || 'UNNAMED'}</div>
+        <div class="board-meta">${h.address || 'Unknown location'} · ${h.claimers || 1} claimer${(h.claimers||1)>1?'s':''}</div>
+      </div>
+      <div class="board-days">
+        <div class="dnum">${daysSince(h.createdAt)}</div>
+        <div class="dlbl">DAYS</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+window._submitClaim = async function(name, lat, lng, address, imageDataUrl) {
+  const { collection, addDoc, serverTimestamp } = window._fbModules;
+  const db = window._db;
+  showLoading('REGISTERING YOUR HOLE...');
+  try {
+    const docRef = await addDoc(collection(db, 'potholes'), {
+      name: name.toUpperCase(),
+      lat, lng, address,
+      image: imageDataUrl,
+      claimers: 1,
+      fixed: false,
+      createdAt: serverTimestamp()
+    });
+    hideLoading();
+    return docRef.id;
+  } catch(e) {
+    hideLoading();
+    showToast('Error saving — check Firestore is enabled');
+    console.error(e);
+    return null;
+  }
+};
+
+function daysSince(ts) {
+  if (!ts) return 0;
+  const ms = ts.toDate ? ts.toDate().getTime() : ts;
+  return Math.floor((Date.now() - ms) / 86400000);
+}
+
+window.daysSince = daysSince;
+</script>
+
+<!-- Mapbox + App logic -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script>
+const MAPBOX_TOKEN = 'pk.eyJ1IjoicG90aG9sZXMiLCJhIjoiY21ubXphdXZ6MWQzODJvcXNuY3J5NXZybSJ9.XnJMs8p2ooYYRBiWA1AfWg';
+
+let map, userLng, userLat, videoStream, capturedImageDataUrl, capturedAddress;
+let currentScreen = 'splash';
+let markers = [];
+
+// ── SCREEN MANAGEMENT ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen = id;
+  window.scrollTo(0, 0);
+}
+window.showScreen = showScreen;
+
+// ── TOAST ──
+function showToast(msg, dur = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+window.showToast = showToast;
+
+// ── LOADING ──
+function showLoading(msg = 'LOADING...') {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+window.showLoading = showLoading;
+window.hideLoading = hideLoading;
+
+// ── TABS ──
+function switchTab(tab) {
+  if (tab === 'map') {
+    showScreen('map-screen');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-map').classList.add('active');
+    document.getElementById('bnav-map') && document.getElementById('bnav-map').classList.remove('active');
+    if (map) setTimeout(() => map.resize(), 100);
+  } else if (tab === 'board') {
+    showScreen('board-screen');
+    window.loadBoard && window.loadBoard();
+  }
+}
+window.switchTab = switchTab;
+
+// ── MAP INIT ──
+function initMap() {
+  showLoading('LOADING MAP...');
+  showScreen('map-screen');
+
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+
+  map = window._map = new mapboxgl.Map({
+    container: 'mapbox-container',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    zoom: 14,
+    center: [-2.2, 53.48] // Manchester default
+  });
+
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+  map.on('load', () => {
+    hideLoading();
+    getLocation();
+    if (window._holes) renderMarkers(window._holes);
+
+    // FAB
+    const fab = document.createElement('button');
+    fab.className = 'fab';
+    fab.innerHTML = '<span>📸</span> CLAIM A HOLE';
+    fab.onclick = startCamera;
+    document.getElementById('mapbox-container').appendChild(fab);
+  });
+
+  map.on('error', () => { hideLoading(); showToast('Map error — check Mapbox token'); });
+}
+window.initMap = initMap;
+
+// ── GEOLOCATION ──
+function getLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+
+    if (window._userMarker) {
+      window._userMarker.setLngLat([userLng, userLat]);
+    } else {
+      const el = document.createElement('div');
+      el.className = 'my-location-dot';
+      window._userMarker = new mapboxgl.Marker(el).setLngLat([userLng, userLat]).addTo(map);
+      map.flyTo({ center: [userLng, userLat], zoom: 15, speed: 1.2 });
+    }
+
+    document.getElementById('gps-indicator').textContent =
+      `📍 ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
+  }, err => {
+    showToast('Location access needed for full functionality');
+  }, { enableHighAccuracy: true });
+}
+
+// ── RENDER MARKERS ──
+function renderMarkers(holes) {
+  markers.forEach(m => m.remove());
+  markers = [];
+
+  holes.forEach(hole => {
+    if (!hole.lat || !hole.lng) return;
+
+    const el = document.createElement('div');
+    el.className = 'hole-marker-el';
+    el.style.position = 'relative';
+
+    const label = document.createElement('div');
+    label.className = 'hole-label-tag';
+    label.textContent = hole.name || 'UNNAMED';
+
+    const dot = document.createElement('div');
+    dot.className = 'hole-dot';
+    dot.textContent = '🕳️';
+
+    const days = document.createElement('div');
+    days.className = 'hole-days-tag';
+    days.textContent = `${window.daysSince ? window.daysSince(hole.createdAt) : 0}d ignored`;
+
+    el.appendChild(label);
+    el.appendChild(dot);
+    el.appendChild(days);
+
+    const popup = new mapboxgl.Popup({ offset: 25, closeButton: true })
+      .setHTML(`
+        <div class="popup-name">${hole.name || 'UNNAMED'}</div>
+        <div class="popup-meta">${hole.address || 'Unknown location'}</div>
+        <div class="popup-days">🕳️ ${window.daysSince ? window.daysSince(hole.createdAt) : 0} days ignored</div>
+        <div class="popup-claimers">${hole.claimers || 1} claimer${(hole.claimers||1)>1?'s':''} · £${hole.claimers || 1} in pot</div>
+      `);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([hole.lng, hole.lat])
+      .setPopup(popup)
+      .addTo(map);
+
+    markers.push(marker);
+  });
+}
+
+// ── CAMERA ──
+async function startCamera() {
+  showScreen('camera-screen');
+  const statusEl = document.getElementById('ar-status');
+  const targetEl = document.getElementById('target-ellipse');
+  statusEl.textContent = '📷 Starting camera...';
+  statusEl.classList.remove('detected');
+  targetEl.classList.remove('locked');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    videoStream = stream;
+    const video = document.getElementById('camera-video');
+    video.srcObject = stream;
+    await video.play();
+
+    // Simulate AR detection after 2.5s
+    setTimeout(() => {
+      statusEl.textContent = '✅ POTHOLE DETECTED — TAP TO CAPTURE';
+      statusEl.classList.add('detected');
+      targetEl.classList.add('locked');
+    }, 2500);
+
+    statusEl.textContent = '🔍 SCANNING FOR POTHOLE...';
+
+  } catch(err) {
+    showToast('Camera access denied — please allow camera permissions');
+    showScreen('map-screen');
+  }
+}
+window.startCamera = startCamera;
+
+function stopCamera() {
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+  }
+  const video = document.getElementById('camera-video');
+  video.srcObject = null;
+}
+window.stopCamera = stopCamera;
+
+// ── CAPTURE PHOTO ──
+async function capturePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('claim-canvas');
+
+  // Draw frame from video
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+
+  if (video.readyState >= 2) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  capturedImageDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  stopCamera();
+
+  // ── AI VERIFICATION ──
+  showLoading('🔍 VERIFYING POTHOLE...');
+
+  const verdict = await verifyPothole(capturedImageDataUrl);
+
+  hideLoading();
+
+  if (!verdict.valid) {
+    showRejection(verdict.reason);
+    return;
+  }
+
+  // Passed — proceed to claim screen
+  if (userLat && userLng) {
+    document.getElementById('claim-coords').textContent =
+      `${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+    reverseGeocode(userLat, userLng);
+  } else {
+    document.getElementById('claim-coords').textContent = 'No GPS';
+    document.getElementById('claim-addr').textContent = 'Unknown';
+    capturedAddress = 'Unknown location';
+  }
+
+  document.getElementById('claim-status-val').textContent = 'UNCLAIMED';
+  document.getElementById('claim-status-val').style.color = 'var(--yellow)';
+  document.getElementById('claim-claimers').textContent = '0 — be first!';
+  document.getElementById('claim-location-label').textContent =
+    userLat ? `📍 ${userLat.toFixed(5)}, ${userLng.toFixed(5)}` : '📍 Location unknown';
+
+  showScreen('claim-screen');
+}
+window.capturePhoto = capturePhoto;
+
+// ── AI POTHOLE VERIFICATION ──
+async function verifyPothole(imageDataUrl) {
+  try {
+    const base64 = imageDataUrl.split(',')[1];
+    const response = await fetch('/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 })
+    });
+    if (!response.ok) throw new Error('Function error');
+    return await response.json();
+  } catch(e) {
+    console.error('Verification error:', e);
+    return { valid: false, reason: 'Verification failed — please try again' };
+  }
+}
+
+// ── REJECTION SCREEN ──
+function showRejection(reason) {
+  // Re-show camera screen with rejection state
+  showScreen('camera-screen');
+
+  const statusEl = document.getElementById('ar-status');
+  const targetEl = document.getElementById('target-ellipse');
+
+  statusEl.textContent = `❌ REJECTED`;
+  statusEl.classList.add('detected');
+  statusEl.style.borderColor = 'rgba(212,43,43,0.6)';
+  statusEl.style.color = 'var(--red)';
+  targetEl.classList.remove('locked');
+  targetEl.style.borderColor = 'var(--red)';
+
+  // Show rejection overlay
+  const existing = document.getElementById('rejection-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'rejection-overlay';
+  overlay.style.cssText = `
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 2rem;
+    text-align: center;
+  `;
+
+  overlay.innerHTML = `
+    <div style="font-size:3rem;margin-bottom:1rem">🕳️❌</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--red);line-height:1;margin-bottom:0.8rem">NOT A POTHOLE</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#aaa;letter-spacing:0.1em;margin-bottom:2rem;line-height:1.7;max-width:280px">${reason}</div>
+    <button onclick="dismissRejection()" style="
+      background:var(--yellow);
+      color:var(--black);
+      border:none;
+      padding:0.9rem 2rem;
+      font-family:'Bebas Neue',sans-serif;
+      font-size:1.4rem;
+      letter-spacing:0.1em;
+      cursor:pointer;
+      box-shadow:4px 4px 0 rgba(0,0,0,0.3);
+    ">TRY AGAIN →</button>
+  `;
+
+  document.getElementById('camera-screen').appendChild(overlay);
+}
+
+function dismissRejection() {
+  const overlay = document.getElementById('rejection-overlay');
+  if (overlay) overlay.remove();
+
+  const statusEl = document.getElementById('ar-status');
+  const targetEl = document.getElementById('target-ellipse');
+  statusEl.textContent = '🔍 SCANNING FOR POTHOLE...';
+  statusEl.classList.remove('detected');
+  statusEl.style.borderColor = '';
+  statusEl.style.color = '';
+  targetEl.style.borderColor = '';
+  targetEl.classList.remove('locked');
+
+  // Restart camera
+  startCamera();
+}
+window.dismissRejection = dismissRejection;
+
+// ── REVERSE GEOCODE ──
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=address,poi&limit=1`
+    );
+    const data = await res.json();
+    const place = data.features && data.features[0];
+    if (place) {
+      const short = place.place_name.split(',').slice(0,2).join(',');
+      capturedAddress = place.place_name;
+      document.getElementById('claim-addr').textContent = short;
+      document.getElementById('claim-location-label').textContent = `📍 ${short}`;
+    }
+  } catch(e) {
+    capturedAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+}
+
+// ── SUBMIT CLAIM ──
+async function submitClaim() {
+  const nameInput = document.getElementById('hole-name-input');
+  const name = nameInput.value.trim().toUpperCase();
+
+  if (!name) {
+    showToast('Give your pothole a name first!');
+    nameInput.focus();
+    return;
+  }
+
+  const btn = document.getElementById('claim-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'REGISTERING...';
+
+  const lat = userLat || 53.483;
+  const lng = userLng || -2.244;
+  const address = capturedAddress || 'Unknown location';
+
+  // Compress image for Firestore (keep small)
+  let imageData = '';
+  if (capturedImageDataUrl) {
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = 400;
+    tmpCanvas.height = 225;
+    const ctx = tmpCanvas.getContext('2d');
+    const img = new Image();
+    img.src = capturedImageDataUrl;
+    await new Promise(r => img.onload = r);
+    ctx.drawImage(img, 0, 0, 400, 225);
+    imageData = tmpCanvas.toDataURL('image/jpeg', 0.5);
+  }
+
+  const id = await window._submitClaim(name, lat, lng, address, imageData);
+
+  btn.disabled = false;
+  btn.textContent = 'PUT A QUID IN →';
+
+  if (id) {
+    // Populate confirmed screen
+    document.getElementById('conf-name-sub').textContent = `You named it ${name}`;
+    document.getElementById('conf-id').textContent = `HOLE #PL-${id.substring(0,6).toUpperCase()}`;
+    document.getElementById('share-hole-name').textContent = name;
+    document.getElementById('share-council').textContent = 'your council';
+    nameInput.value = '';
+    showScreen('confirmed-screen');
+  }
+}
+window.submitClaim = submitClaim;
+
+// ── SHARE ──
+function shareHole() {
+  const name = document.getElementById('share-hole-name').textContent;
+  const text = `I just claimed ${name} on Pothole Lottery. Ignored by the council and counting. Put a quid in 👉 afa.digital/pothole`;
+  if (navigator.share) {
+    navigator.share({ title: 'Pothole Lottery', text, url: 'https://afa.digital/pothole' });
+  } else {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+  }
+}
+window.shareHole = shareHole;
+</script>
+
+</body>
+</html>
