@@ -1306,7 +1306,7 @@ body::after {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc, increment, serverTimestamp, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, OAuthProvider, onAuthStateChanged, signOut }
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1340,7 +1340,9 @@ onAuthStateChanged(auth, (user) => {
 window._signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try {
-    await signInWithPopup(auth, provider);
+    // Save pending state so we can resume after redirect
+    sessionStorage.setItem('authPending', 'true');
+    await signInWithRedirect(auth, provider);
     return true;
   } catch(e) {
     console.error(e);
@@ -1351,13 +1353,31 @@ window._signInWithGoogle = async () => {
 window._signInWithApple = async () => {
   const provider = new OAuthProvider('apple.com');
   try {
-    await signInWithPopup(auth, provider);
+    sessionStorage.setItem('authPending', 'true');
+    await signInWithRedirect(auth, provider);
     return true;
   } catch(e) {
     console.error(e);
     return false;
   }
 };
+
+// Handle redirect result on page load
+getRedirectResult(auth).then((result) => {
+  if (result && result.user) {
+    sessionStorage.removeItem('authPending');
+    showToast('Welcome, ' + (result.user.displayName || 'back') + '! 🕳️');
+    // If there was a pending claim, trigger it
+    const pendingName = sessionStorage.getItem('pendingHoleName');
+    if (pendingName) {
+      sessionStorage.removeItem('pendingHoleName');
+      document.getElementById('hole-name-input').value = pendingName;
+      showScreen('claim-screen');
+    }
+  }
+}).catch((e) => {
+  console.error('Redirect result error:', e);
+});
 
 window._signOut = async () => {
   await signOut(auth);
@@ -1870,6 +1890,9 @@ window.signInApple = signInApple;
 async function submitClaim() {
   // Check auth first
   if (!window._currentUser) {
+    // Save hole name so we can restore after redirect auth
+    const nameVal = document.getElementById('hole-name-input').value.trim();
+    if (nameVal) sessionStorage.setItem('pendingHoleName', nameVal);
     showAuth(() => submitClaim());
     return;
   }
